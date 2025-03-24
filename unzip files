@@ -1,0 +1,83 @@
+For extracting ZIP files using the latest Zip4j (v2.x), use the following approach:
+
+Maven Dependency for Zip4j (Latest)
+
+If you're using Maven, add this to your pom.xml:
+
+<dependency>
+    <groupId>net.lingala.zip4j</groupId>
+    <artifactId>zip4j</artifactId>
+    <version>2.11.5</version> <!-- Latest version -->
+</dependency>
+
+
+---
+
+Updated Code for Extracting ZIP Files Using Zip4j (v2.x)
+
+import net.lingala.zip4j.ZipFile;
+import net.lingala.zip4j.exception.ZipException;
+import net.lingala.zip4j.model.ExtractParameters;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.file.Files;
+
+public class ZipExtractor {
+
+    private static final String ZIP_PASSWORD = "your_zip_password"; // Update password if required
+
+    public static void extractZipFile(byte[] zipBytes, String zipFileName) {
+        try {
+            // Save ZIP to a temp file
+            File zipFile = new File(System.getProperty("java.io.tmpdir"), zipFileName);
+            try (FileOutputStream fos = new FileOutputStream(zipFile)) {
+                fos.write(zipBytes);
+            }
+
+            // Create temp extraction directory
+            File extractDir = new File(System.getProperty("java.io.tmpdir"), "extracted_files");
+            if (!extractDir.exists()) {
+                extractDir.mkdirs(); // Create the directory if it doesn't exist
+            }
+
+            // Open ZIP file
+            ZipFile zip = new ZipFile(zipFile);
+
+            // Check if ZIP is password-protected
+            if (zip.isEncrypted()) {
+                zip.setPassword(ZIP_PASSWORD.toCharArray());
+            }
+
+            // Extract all files
+            zip.extractAll(extractDir.getAbsolutePath());
+
+            // Print extracted files
+            System.out.println("Extracted Files:");
+            for (File file : extractDir.listFiles()) {
+                System.out.println(file.getAbsolutePath());
+            }
+
+            // Cleanup (optional)
+            zipFile.delete();
+            
+        } catch (ZipException ze) {
+            System.err.println("Error extracting ZIP: " + ze.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+
+---
+
+How to Use
+
+Call the method and pass the ZIP file as bytes:
+
+byte[] zipBytes = Files.readAllBytes(new File("C:/path/to/your.zip").toPath());
+ZipExtractor.extractZipFile(zipBytes, "sample.zip");
+
+This will extract the ZIP file and print the extracted file paths. Let me know if you need more modifications! 🚀
+
