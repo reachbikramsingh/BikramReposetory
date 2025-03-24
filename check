@@ -1,0 +1,79 @@
+To ensure that all extracted files are placed directly in the root extraction folder (without subfolders), modify the extraction logic.
+
+✅ Updated Zip Extraction Code
+
+This version extracts files directly into the root extraction folder, even if the ZIP contains nested folders.
+
+import net.lingala.zip4j.ZipFile;
+import net.lingala.zip4j.exception.ZipException;
+import net.lingala.zip4j.model.FileHeader;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.util.List;
+
+public class ZipExtractor {
+
+    private static final String ZIP_PASSWORD = "your_zip_password"; // Update password if required
+
+    public static void extractZipFile(byte[] zipBytes, String zipFileName) {
+        try {
+            // Save ZIP to a temp file
+            File zipFile = new File(System.getProperty("java.io.tmpdir"), zipFileName);
+            Files.write(zipFile.toPath(), zipBytes);
+
+            // Root extraction directory
+            File extractRootDir = new File(System.getProperty("java.io.tmpdir"), "extracted_files");
+            if (!extractRootDir.exists()) {
+                extractRootDir.mkdirs();
+            }
+
+            // Open ZIP file
+            ZipFile zip = new ZipFile(zipFile);
+
+            // Check if ZIP is password-protected
+            if (zip.isEncrypted()) {
+                zip.setPassword(ZIP_PASSWORD.toCharArray());
+            }
+
+            // Get all file headers
+            List<FileHeader> fileHeaders = zip.getFileHeaders();
+
+            for (FileHeader fileHeader : fileHeaders) {
+                if (!fileHeader.isDirectory()) { // Ignore directories
+                    File extractedFile = new File(extractRootDir, new File(fileHeader.getFileName()).getName());
+
+                    // Extract each file to temp folder first
+                    zip.extractFile(fileHeader, extractRootDir.getAbsolutePath());
+
+                    // If the file was extracted into a subfolder, move it to root folder
+                    File extractedSubFile = new File(extractRootDir, fileHeader.getFileName());
+                    if (!extractedFile.equals(extractedSubFile)) {
+                        Files.move(extractedSubFile.toPath(), extractedFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                    }
+
+                    System.out.println("Extracted: " + extractedFile.getAbsolutePath());
+                }
+            }
+
+            System.out.println("All files extracted to: " + extractRootDir.getAbsolutePath());
+
+        } catch (ZipException ze) {
+            System.err.println("Error extracting ZIP: " + ze.getMessage());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+
+---
+
+🔍 What This Fixes
+
+✅ Extracts all files into the root folder (extracted_files/)
+✅ Removes subfolder structure (no /shiva/ folder)
+✅ Moves files from subfolders to root 
+
