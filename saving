@@ -1,0 +1,183 @@
+✅ Solution Overview
+
+To handle duplicate attachment names in SharePoint:
+
+1️⃣ Check if the file already exists in SharePoint.
+2️⃣ If it exists, find the next available filename (file_1, file_2, etc.).
+3️⃣ If it does not exist, upload with the original name.
+4️⃣ Repeat this process every time the same attachment arrives again.
+
+
+---
+
+📌 Updated Java Code
+
+import com.microsoft.graph.models.*;
+import com.microsoft.graph.requests.*;
+import com.microsoft.graph.authentication.TokenCredentialAuthProvider;
+import com.azure.identity.ClientSecretCredential;
+import com.azure.identity.ClientSecretCredentialBuilder;
+import org.apache.commons.io.IOUtils;
+
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.util.List;
+
+public class SaveAttachmentsWithUniqueNames {
+
+    private static final String CLIENT_ID = "your-client-id";
+    private static final String TENANT_ID = "your-tenant-id";
+    private static final String CLIENT_SECRET = "your-client-secret";
+    private static final String USER_EMAIL = "user@example.com"; // Change to target mailbox
+    private static final String SITE_ID = "your-sharepoint-site-id";
+    private static final String DRIVE_ID = "your-sharepoint-drive-id";
+
+    public static void main(String[] args) {
+        GraphServiceClient<Request> graphClient = authenticateGraphClient();
+
+        // Read emails from Outlook
+        List<Message> messages = getEmails(graphClient);
+        
+        // Process each email and save attachments
+        for (Message message : messages) {
+            saveAttachmentsWithUniqueNames(graphClient, message);
+        }
+    }
+
+    // Authenticate Graph API
+    private static GraphServiceClient<Request> authenticateGraphClient() {
+        ClientSecretCredential credential = new ClientSecretCredentialBuilder()
+                .clientId(CLIENT_ID)
+                .clientSecret(CLIENT_SECRET)
+                .tenantId(TENANT_ID)
+                .build();
+
+        List<String> scopes = List.of("https://graph.microsoft.com/.default");
+        TokenCredentialAuthProvider authProvider = new TokenCredentialAuthProvider(scopes, credential);
+
+        return GraphServiceClient.builder()
+                .authenticationProvider(authProvider)
+                .buildClient();
+    }
+
+    // Get unread emails from Outlook
+    private static List<Message> getEmails(GraphServiceClient<Request> graphClient) {
+        return graphClient.users(USER_EMAIL)
+                .mailFolders("inbox")
+                .messages()
+                .buildRequest()
+                .select("id,subject,hasAttachments")
+                .filter("hasAttachments eq true and isRead eq false")  // Fetch only unread emails with attachments
+                .top(10)  // Fetch latest 10 emails
+                .get()
+                .getCurrentPage();
+    }
+
+    // Save attachments with unique names in SharePoint
+    private static void saveAttachmentsWithUniqueNames(GraphServiceClient<Request> graphClient, Message message) {
+        try {
+            // Get attachments from the email
+            AttachmentCollectionPage attachments = graphClient.users(USER_EMAIL)
+                    .messages(message.id)
+                    .attachments()
+                    .buildRequest()
+                    .get();
+
+            for (Attachment attachment : attachments.getCurrentPage()) {
+                if (attachment instanceof FileAttachment) {
+                    FileAttachment fileAttachment = (FileAttachment) attachment;
+                    
+                    String originalFileName = fileAttachment.name;
+                    String fileExtension = getFileExtension(originalFileName);
+                    String baseFileName = removeFileExtension(originalFileName);
+
+                    // Find the next available file name
+                    String uniqueFileName = getNextAvailableFileName(graphClient, baseFileName, fileExtension);
+
+                    // Convert attachment content to byte[]
+                    byte[] fileBytes = fileAttachment.contentBytes;
+
+                    // Upload file to SharePoint
+                    graphClient.sites(SITE_ID).drives(DRIVE_ID).root()
+                            .itemWithPath("/Attachments/" + uniqueFileName)
+                            .content()
+                            .buildRequest()
+                            .put(new ByteArrayInputStream(fileBytes));
+
+                    System.out.println("Uploaded attachment: " + uniqueFileName);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error processing attachments: " + e.getMessage());
+        }
+    }
+
+    // Get the next available file name in SharePoint
+    private static String getNextAvailableFileName(GraphServiceClient<Request> graphClient, String baseFileName, String extension) {
+        int count = 1;
+        String newFileName = baseFileName + "." + extension;
+
+        while (fileExistsInSharePoint(graphClient, newFileName)) {
+            newFileName = baseFileName + "_" + count + "." + extension;
+            count++;
+        }
+        return newFileName;
+    }
+
+    // Check if a file exists in SharePoint
+    private static boolean fileExistsInSharePoint(GraphServiceClient<Request> graphClient, String fileName) {
+        try {
+            DriveItem file = graphClient.sites(SITE_ID).drives(DRIVE_ID).root()
+                    .itemWithPath("/Attachments/" + fileName)
+                    .buildRequest()
+                    .get();
+            return file != null;
+        } catch (Exception e) {
+            return false; // File does not exist
+        }
+    }
+
+    // Extract file extension from filename
+    private static String getFileExtension(String fileName) {
+        if (fileName == null || !fileName.contains(".")) {
+            return "";  // No extension found
+        }
+        return fileName.substring(fileName.lastIndexOf(".") + 1);
+    }
+
+    // Remove file extension from filename
+    private static String removeFileExtension(String fileName) {
+        if (fileName == null || !fileName.contains(".")) {
+            return fileName; // Return original name if no extension found
+        }
+        return fileName.substring(0, fileName.lastIndexOf("."));
+    }
+}
+
+
+---
+
+🔍 How This Works
+
+1️⃣ Checks if the file exists in SharePoint using fileExistsInSharePoint().
+2️⃣ If the file exists, appends _1, _2, _3 dynamically.
+3️⃣ Uploads the file with a unique name like:
+
+report.pdf
+
+report_1.pdf
+
+report_2.pdf
+4️⃣ Handles any file type dynamically.
+
+
+
+---
+
+📌 Example Output
+
+Uploaded attachment: report.pdf
+Uploaded attachment: report_1.pdf
+Uploaded attachment: report_2.pdf
+Uploaded attachment: invoice.xlsx
+Uploaded attachment: 
