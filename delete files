@@ -1,0 +1,47 @@
+You can modify the deletion logic to check whether the directory exists and contains files before attempting to delete them. Here's an optimized version:
+
+import java.io.IOException;
+import java.nio.file.*;
+
+public class DeleteFilesIfExists {
+    public static void main(String[] args) {
+        Path directory = Paths.get("D:\\dev");
+
+        // Check if directory exists
+        if (!Files.exists(directory) || !Files.isDirectory(directory)) {
+            System.out.println("Directory does not exist or is not a valid directory. Exiting.");
+            return;
+        }
+
+        try {
+            boolean hasFiles = Files.list(directory).findAny().isPresent();
+            
+            if (!hasFiles) {
+                System.out.println("No files to delete. Exiting.");
+                return;
+            }
+
+            Files.list(directory).forEach(file -> {
+                try {
+                    Files.delete(file);
+                    System.out.println("Deleted: " + file);
+                } catch (IOException e) {
+                    System.err.println("Failed to delete: " + file + " - " + e.getMessage());
+                }
+            });
+        } catch (IOException e) {
+            System.err.println("Error accessing directory: " + e.getMessage());
+        }
+    }
+}
+
+How It Works:
+
+1. Checks if D:\dev exists. If not, it exits.
+
+
+2. Checks if the directory contains files. If empty, it exits.
+
+
+3. Deletes nothing if the directory is empty or missing. Let me know if you need any tweaks!
+
